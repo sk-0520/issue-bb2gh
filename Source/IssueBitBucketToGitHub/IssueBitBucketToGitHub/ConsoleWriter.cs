@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 
 namespace ContentTypeTextNet.IssueBitBucketToGitHub
 {
-    internal class Program
+    public class ConsoleWriter
     {
-        public static void Main()
-        {
-            var app = new Application();
-            app.Execute();
-        }
+        #region function
+
+
+
+        #endregion
     }
 }
