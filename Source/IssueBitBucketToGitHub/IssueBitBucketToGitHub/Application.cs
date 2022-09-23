@@ -268,6 +268,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         private async Task ApplyIssuesAsync(GitHubClient client, Repository repository, BitbucketDbV1 bitbucketDb, Setting setting)
         {
             var bitbucketIssueList = bitbucketDb.Issues
+                .Where(i => setting.Continue.StartIssueNumber <= i.Id)
                 .OrderBy(i => i.Id)
                 .ToList()
             ;
@@ -298,13 +299,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             var repository = await GitHubApiAsync(client, c => c.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository));
 
-            if(setting.Label.Items.Any()) {
-                ConsoleUtility.Title("ラベル構築");
-#if IS_ENABLED_LABEL
-                await ApplyLabelAsync(client, repository, setting.Label);
-#else
-                ConsoleUtility.LogWarning("ラベル構築 未実施");
-#endif
+            if(setting.Continue.BuildLabel) {
+                if(setting.Label.Items.Any()) {
+                    ConsoleUtility.Title("ラベル構築");
+                    await ApplyLabelAsync(client, repository, setting.Label);
+                    ConsoleUtility.LogWarning("ラベル構築 未実施");
+                }
             }
 
             ConsoleUtility.Title("課題構築");

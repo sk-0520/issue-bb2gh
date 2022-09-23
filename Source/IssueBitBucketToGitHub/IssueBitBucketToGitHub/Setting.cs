@@ -6,6 +6,16 @@ using System.Threading.Tasks;
 
 namespace ContentTypeTextNet.IssueBitBucketToGitHub
 {
+    public class ContinueSetting
+    {
+        #region proeprty
+
+        public bool BuildLabel { get; set; }
+        public int StartIssueNumber { get; set; }
+
+        #endregion
+    }
+
     public class GitHubSetting
     {
         #region property
@@ -141,6 +151,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     public class Setting
     {
         #region property
+
+        public ContinueSetting Continue { get; set; } = new();
 
         /// <summary>
         /// GitHub 設定。
