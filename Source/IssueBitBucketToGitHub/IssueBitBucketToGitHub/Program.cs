@@ -8,10 +8,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 {
     internal class Program
     {
-        public static void Main()
+        public static Task Main()
         {
             var app = new Application();
-            app.Execute();
+            return app.ExecuteAsync();
         }
     }
 }

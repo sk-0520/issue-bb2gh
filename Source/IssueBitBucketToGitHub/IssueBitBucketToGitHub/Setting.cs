@@ -6,16 +6,11 @@ using System.Threading.Tasks;
 
 namespace ContentTypeTextNet.IssueBitBucketToGitHub
 {
-    public class Setting
-    {
-        #region property
-
-        public string BaseUrl { get; set; } = string.Empty;
-        public string ApiToken { get; set; } = string.Empty;
-        public string Owner { get; set; } = string.Empty;
-        public string Repository { get; set; } = string.Empty;
-        public string IssueDirectoryPath { get; set; } = string.Empty;
-
-        #endregion
-    }
+    public record Setting(
+        Uri BaseUrl,
+        string ApiToken,
+        string Owner,
+        string Repository,
+        string IssueDirectoryPath
+    );
 }
