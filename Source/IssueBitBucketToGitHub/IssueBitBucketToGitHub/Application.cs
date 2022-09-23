@@ -111,10 +111,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 throw new InvalidOperationException(settingPath);
             }
 
-            var rawDelayTime = GetSettingValue("delay", commandLine, commandKeys.DelayTime, "0.00:00:05.0", true);
+            var rawDelayTime = GetSettingValue("delay", commandLine, commandKeys.DelayTime, "0.00:00:02.5", true);
             var delayTime = TimeSpan.Parse(rawDelayTime);
 
-            var rawRateDelayTime = GetSettingValue("rate", commandLine, commandKeys.RateLimitTime, "0.00:01:00.0", true);
+            var rawRateDelayTime = GetSettingValue("rate", commandLine, commandKeys.RateLimitTime, "0.01:00:00.0", true);
             var rateDelayTime = TimeSpan.Parse(rawRateDelayTime);
 
             return (setting: setting, delayTime: delayTime, rateDelayTime: rateDelayTime);
@@ -144,13 +144,13 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         private async Task ApplyLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting)
         {
-            var labels = await GitHubApiAsync(client, c => c.Issue.Labels.GetAllForRepository(repository.Id));
+            var labels = await GitHubApiAsync(client, c => c.Issue.Labels.GetAllForRepository(repository.Owner.Login, repository.Name));
             if(labels.Any()) {
                 ConsoleUtility.Subject("既存ラベル破棄");
 
                 foreach(var label in labels) {
                     ConsoleUtility.LogInformation($"ラベル削除: {label.Id}, {label.Name}");
-                    await GitHubApiAsync(client, c => c.Issue.Labels.Delete(repository.Id, label.Name));
+                    await GitHubApiAsync(client, c => c.Issue.Labels.Delete(repository.Owner.Login, repository.Name, label.Name));
                 }
             } else {
                 ConsoleUtility.LogTrace("削除ラベルなし");
@@ -160,7 +160,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             foreach(var item in labelSetting.Items) {
                 ConsoleUtility.LogInformation($"ラベル作成: {item}");
                 var newLabel = new NewLabel(item, "cccccc"); // 色なんか後で変えてくれ
-                var label = await GitHubApiAsync(client, c => c.Issue.Labels.Create(repository.Id, newLabel));
+                var label = await GitHubApiAsync(client, c => c.Issue.Labels.Create(repository.Owner.Login, repository.Name, newLabel));
                 ConsoleUtility.LogDebug($"ラベル結果: {label.Id}");
             }
         }
@@ -215,14 +215,14 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var githubIssue = new NewIssue(BuildTitle(issue, setting.Template.IssueTitle, setting.Bitbucket));
             githubIssue.Body = BuildIssueBody(issue, setting.Template.IssueBody, setting.Bitbucket);
 
-            var issueResult = await GitHubApiAsync(client, c => c.Issue.Create(repository.Id, githubIssue));
+            var issueResult = await GitHubApiAsync(client, c => c.Issue.Create(repository.Owner.Login, repository.Name, githubIssue));
             ConsoleUtility.LogDebug($"課題結果 -> [{issue.Id}:{issueResult.Number}] {issueResult.Title}");
 
             if(comments.Any()) {
-                ConsoleUtility.LogInformation("課題コメント作成");
+                ConsoleUtility.LogInformation($"課題コメント作成 [{issue.Id}:{issueResult.Number}] {comments.Length}");
                 foreach(var comment in comments) {
                     var commentContent = BuildCommentBody(issue, comment, setting.Template.Comment, setting.Bitbucket);
-                    var commentResult = await GitHubApiAsync(client, c => c.Issue.Comment.Create(repository.Id, issueResult.Number, commentContent));
+                    var commentResult = await GitHubApiAsync(client, c => c.Issue.Comment.Create(repository.Owner.Login, repository.Name, issueResult.Number, commentContent));
                     ConsoleUtility.LogDebug($"課題コメント結果: {commentResult.Id}");
                 }
             } else {
@@ -234,7 +234,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                     State = ItemState.Closed,
                 };
 
-                var issueCloseResult = await GitHubApiAsync(client, c => c.Issue.Update(repository.Id, issueResult.Number, githubUpdateIssue));
+                var issueCloseResult = await GitHubApiAsync(client, c => c.Issue.Update(repository.Owner.Login, repository.Name, issueResult.Number, githubUpdateIssue));
                 ConsoleUtility.LogDebug($"課題クローズ: {issueCloseResult.Id}");
             }
         }
