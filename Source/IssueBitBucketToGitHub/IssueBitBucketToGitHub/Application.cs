@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using System.Text.Json;
@@ -63,7 +64,6 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         {
             var issueFilePath = Path.Combine(bitbucketSetting.IssueDirectoryPath, "db-1.0.json");
 
-
             using var stream = OpenFileStream(issueFilePath);
             var result = JsonSerializer.Deserialize<BitbucketDbV1>(stream);
             if(result is null) {
@@ -82,30 +82,40 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return client;
         }
 
+        private async Task ClearLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting)
+        {
+            var labels = await client.Issue.Labels.GetAllForRepository(repository.Id);
+            if(labels.Any()) {
+                foreach(var label in labels) {
+                    ConsoleUtility.LogInformation($"ラベル削除: {label.Id}, {label.Name}");
+                    await client.Issue.Labels.Delete(repository.Id, label.Name);
+                }
+            } else {
+                ConsoleUtility.LogInformation("削除ラベルなし");
+            }
+
+            foreach(var item in labelSetting.Items) {
+                ConsoleUtility.LogInformation($"ラベル作成: {item}");
+                var newLabel = new NewLabel(item, "cccccc"); // 色なんか後で変えてくれ
+                var label = await client.Issue.Labels.Create(repository.Id, newLabel);
+                ConsoleUtility.LogInformation($"ラベル結果: {label.Id}");
+            }
+        }
+
         private async Task ExecuteCoreAsync(Setting setting)
         {
             // Bitbucket Issue を読み込む
-            LoadBitbucketIssues(setting.Bitbucket);
+            var bitbucketIssues = LoadBitbucketIssues(setting.Bitbucket);
 
             var client = CreateGitHubClient(setting.GitHub);
 
             var repository = await client.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository);
 
-            var issue = new NewIssue("TITLE");
-            //issue.Assignees.Add("sk-0520");
-            //issue.Assignees.Add("bot");
-            issue.Body = "#abc\r\n* A\r\n* B\r\n* C";
+            if(setting.Label.Items.Any()) {
+                ConsoleUtility.Title("ラベル構築");
+                await ClearLabelAsync(client, repository, setting.Label);
+            }
 
-            var x = await client.Issue.Create(repository.Id, issue);
-
-            var y = await client.Issue.Comment.Create(repository.Id, x.Number, "**COMMENT**");
-
-            var issue2 = new IssueUpdate() {
-                State = ItemState.Closed,
-            };
-            var z = await client.Issue.Update(repository.Id, x.Number, issue2);
-
-            await Task.CompletedTask;
         }
 
         public Task ExecuteAsync()
