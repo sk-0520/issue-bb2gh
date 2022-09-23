@@ -60,7 +60,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return setting;
         }
 
-        public BitbucketDbV1 LoadBitbucketIssues(BitbucketSetting bitbucketSetting)
+        public BitbucketDbV1 LoadBitbucketDb(BitbucketSetting bitbucketSetting)
         {
             var issueFilePath = Path.Combine(bitbucketSetting.IssueDirectoryPath, "db-1.0.json");
 
@@ -82,7 +82,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return client;
         }
 
-        private async Task ClearLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting)
+        private async Task ApplyLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting)
         {
             var labels = await client.Issue.Labels.GetAllForRepository(repository.Id);
             if(labels.Any()) {
@@ -91,21 +91,41 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                     await client.Issue.Labels.Delete(repository.Id, label.Name);
                 }
             } else {
-                ConsoleUtility.LogInformation("削除ラベルなし");
+                ConsoleUtility.LogDebug("削除ラベルなし");
             }
 
             foreach(var item in labelSetting.Items) {
                 ConsoleUtility.LogInformation($"ラベル作成: {item}");
                 var newLabel = new NewLabel(item, "cccccc"); // 色なんか後で変えてくれ
                 var label = await client.Issue.Labels.Create(repository.Id, newLabel);
-                ConsoleUtility.LogInformation($"ラベル結果: {label.Id}");
+                ConsoleUtility.LogDebug($"ラベル結果: {label.Id}");
+            }
+        }
+
+        private async Task ApplyIssuesAsync(GitHubClient client, Repository repository, BitbucketDbV1 bitbucketDb, Setting setting)
+        {
+            await Task.CompletedTask;
+
+            var bitbucketIssueList = bitbucketDb.Issues
+                .OrderBy(i => i.Id)
+                .ToList()
+            ;
+            var bitbucketIssueComments = bitbucketDb.Comments
+                .GroupBy(i => i.Issue)
+                .ToDictionary(
+                    k => k.Key,
+                    v => v.OrderBy(i => i.CreatedOn).ToArray()
+                )
+            ;
+
+            foreach(var issue in bitbucketIssueList) {
+
             }
         }
 
         private async Task ExecuteCoreAsync(Setting setting)
         {
-            // Bitbucket Issue を読み込む
-            var bitbucketIssues = LoadBitbucketIssues(setting.Bitbucket);
+            var bitbucketDb = LoadBitbucketDb(setting.Bitbucket);
 
             var client = CreateGitHubClient(setting.GitHub);
 
@@ -113,8 +133,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             if(setting.Label.Items.Any()) {
                 ConsoleUtility.Title("ラベル構築");
-                await ClearLabelAsync(client, repository, setting.Label);
+                await ApplyLabelAsync(client, repository, setting.Label);
             }
+
+            ConsoleUtility.Title("課題構築");
+            await ApplyIssuesAsync(client, repository, bitbucketDb, setting);
 
         }
 
