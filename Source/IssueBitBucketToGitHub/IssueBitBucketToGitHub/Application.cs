@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using ContentTypeTextNet.Pe.Core.Models;
 using Octokit;
@@ -34,43 +35,30 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         {
             var commandLine = new CommandLine();
             var commandKeys = new {
-                BaseUrl = commandLine.Add(shortKey: 'b', longKey: "base-url", hasValue: true),
-                ApiToken = commandLine.Add(shortKey: 't', longKey: "api-token", hasValue: true),
-                Owner = commandLine.Add(shortKey: 'o', longKey: "owner", hasValue: true),
-                Repository = commandLine.Add(shortKey: 'r', longKey: "repository", hasValue: true),
-                IssueDirectory = commandLine.Add(shortKey: 'i', longKey: "issue-directory", hasValue: true),
+                Setting = commandLine.Add(shortKey: 's', longKey: "setting", hasValue: true),
             };
 
             if(!commandLine.Parse()) {
                 throw new InvalidOperationException();
             }
 
-            var baseUrl = GetSettingValue("base-url", commandLine, commandKeys.BaseUrl, "https://api.github.com", true);
-            var apiToken = GetSettingValue("api-token", commandLine, commandKeys.ApiToken, string.Empty, false);
-            var owner = GetSettingValue("owner", commandLine, commandKeys.Owner, string.Empty, false);
-            var repository = GetSettingValue("repository", commandLine, commandKeys.Repository, string.Empty, false);
-            var issueDirectoryPath = GetSettingValue("issues dir", commandLine, commandKeys.IssueDirectory, string.Empty, false);
+            var defaultPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly()!.Location)!, "setting.json");
+            var settingPath = GetSettingValue("setting", commandLine, commandKeys.Setting, defaultPath, false)!;
 
-            var setting = new Setting(
-                new Uri(baseUrl),
-                apiToken,
-                owner,
-                repository,
-                issueDirectoryPath
-            );
-
-            if(!Directory.Exists(setting.IssueDirectoryPath)) {
-                throw new Exception(commandKeys.IssueDirectory.LongKey + ": " + setting.IssueDirectoryPath);
+            using var stream = new FileStream(settingPath, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read);
+            var setting = JsonSerializer.Deserialize<Setting>(stream);
+            if(setting is null) {
+                throw new InvalidOperationException(settingPath);
             }
 
             return setting;
         }
 
-        private GitHubClient CreateGitHubClient(Setting setting)
+        private GitHubClient CreateGitHubClient(BasicSetting setting)
         {
             var productHeaderValue = new ProductHeaderValue(Assembly.GetExecutingAssembly().GetName().Name);
             var credentials = new Credentials(setting.ApiToken);
-            var client = new GitHubClient(productHeaderValue, new InMemoryCredentialStore(credentials), setting.BaseUrl);
+            var client = new GitHubClient(productHeaderValue, new InMemoryCredentialStore(credentials), new Uri(setting.BaseUrl));
 
             return client;
         }
@@ -79,7 +67,18 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         {
             // Bitbucket Issue を読み込む
 
-            var client = CreateGitHubClient(setting);
+            var client = CreateGitHubClient(setting.Basic);
+
+            var repository = await client.Repository.Get(setting.Basic.Owner, setting.Basic.Repository);
+
+            var issue = new NewIssue("TITLE");
+            //issue.Assignees.Add("sk-0520");
+            //issue.Assignees.Add("bot");
+            issue.Body = "#abc\r\n* A\r\n* B\r\n* C";
+
+            var x = await client.Issue.Create(repository.Id, issue);
+
+            var y = await client.Issue.Comment.Create(repository.Id, x.Number, "**COMMENT**");
 
             await Task.CompletedTask;
         }
