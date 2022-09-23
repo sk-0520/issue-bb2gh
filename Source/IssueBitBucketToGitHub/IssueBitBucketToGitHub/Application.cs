@@ -13,15 +13,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region function
 
-        private void ExecuteCore(string apiBase, string apiToken, string owner, string repository, string issueDirectoryPath)
-        {
-
-        }
-
-        public void Execute()
+        private Setting LoadSetting()
         {
             var commandLine = new CommandLine();
-            commandLine.Add(shortKey: 'b', longKey: "api-base", hasValue: true);
+            commandLine.Add(shortKey: 'b', longKey: "base-url", hasValue: true);
             commandLine.Add(shortKey: 't', longKey: "api-token", hasValue: true);
             commandLine.Add(shortKey: 'o', longKey: "owner", hasValue: true);
             commandLine.Add(shortKey: 'r', longKey: "repository", hasValue: true);
@@ -31,17 +26,36 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 throw new InvalidOperationException();
             }
 
-            var apiBase = ConsoleUtility.ReadRetryDefault("api-base", commandLine.GetValue("api-base", "https://api.github.com"));
+            var baseUrl = ConsoleUtility.ReadRetryDefault("base-url", commandLine.GetValue("base-url", "https://api.github.com"));
             var apiToken = ConsoleUtility.ReadRetryDefault("api-token", commandLine.GetValue("api-token", string.Empty));
             var owner = ConsoleUtility.ReadRetryDefault("owner", commandLine.GetValue("owner", string.Empty));
             var repository = ConsoleUtility.ReadRetryDefault("repository", commandLine.GetValue("repository", string.Empty));
             var issueDirectoryPath = ConsoleUtility.ReadRetryDefault("issues dir", commandLine.GetValue("issue-directory", string.Empty));
 
-            if(!Directory.Exists(issueDirectoryPath)) {
-                throw new Exception(issueDirKey.LongKey + ": " + issueDirectoryPath);
+            var setting = new Setting {
+                BaseUrl = baseUrl,
+                ApiToken = apiToken,
+                Owner = owner,
+                Repository = repository,
+                IssueDirectoryPath = issueDirectoryPath,
+            };
+
+            if(!Directory.Exists(setting.IssueDirectoryPath)) {
+                throw new Exception(issueDirKey.LongKey + ": " + setting.IssueDirectoryPath);
             }
 
-            ExecuteCore(apiBase, apiToken, owner, repository, issueDirectoryPath);
+            return setting;
+        }
+
+        private void ExecuteCore(Setting setting)
+        {
+
+        }
+
+        public void Execute()
+        {
+            var setting = LoadSetting();
+            ExecuteCore(setting);
         }
 
         #endregion
