@@ -57,6 +57,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             Console.WriteLine("========================");
         }
 
+        public static void Subject(string title)
+        {
+            Console.WriteLine("------------------------");
+            Console.WriteLine("{0}", title);
+        }
+
         private static void Log(LogLevel logLevel, string message)
         {
             Console.WriteLine("[{0}] {1}", logLevel, message);

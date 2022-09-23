@@ -85,11 +85,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         ///  </item>
         /// </list>
         /// </summary>
-        public string IssueBody { get; set; } = "";
+        public string IssueBody { get; set; } = "${MARKDOWN}";
         /// <summary>
         /// たぶん <see cref="IssueBody"/> と同じ。
         /// </summary>
-        public string Comment { get; set; } = "";
+        public string Comment { get; set; } = "${MARKDOWN}";
 
         #endregion
     }
