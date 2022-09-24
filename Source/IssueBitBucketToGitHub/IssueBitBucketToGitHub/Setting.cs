@@ -111,7 +111,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
 | 項目 | 内容 |
 |:-:|:--|
-| 元課題 | [${NUMBER}](${URL}) |
+| 元課題 | [#${NUMBER}](${URL}) |
 | 起票日時 | `${CREATED_AT}` |
 | 起票者 | `${USER}` |
 
@@ -127,9 +127,9 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
 | 項目 | 内容 |
 |:-:|:--|
-| 元課題 | [${NUMBER}](${URL}) |
-| 起票日時 | `${CREATED_AT}` |
-| 起票者 | `${USER}` |
+| 元コメント | [#${NUMBER} コメント](${URL}) |
+| コメント日時 | `${CREATED_AT}` |
+| コメントユーザー | `${USER}` |
 
 ";
 
