@@ -32,6 +32,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// 現在レート表示を行う感覚(課題のみ)。
         /// </summary>
         private const int DisplayApiInfoCount = 10;
+        private const int SecondaryRateLimitRetryMaxCount = 3;
 
         #endregion
 
@@ -113,17 +114,24 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         private async Task<TResult> GitHubApiAsync<TResult>(GitHubClient gitHubClient, Func<GitHubClient, Task<TResult>> funcAsync)
         {
             await SleepAsync();
-            try {
-                ConsoleUtility.LogTrace($"API: {++ApiTotalCallCount}");
 
-                var result = await funcAsync(gitHubClient);
+            for(var i = 0; i < SecondaryRateLimitRetryMaxCount; i++) {
+                try {
+                    ConsoleUtility.LogTrace($"API: {++ApiTotalCallCount}");
 
-                return result;
-            } catch(SecondaryRateLimitExceededException ex) {
-                ConsoleUtility.LogWarning(ex.ToString());
-                await DelayRateAsync(gitHubClient);
+                    var result = await funcAsync(gitHubClient);
+
+                    return result;
+                } catch(SecondaryRateLimitExceededException ex) {
+                    ConsoleUtility.LogWarning(ex.ToString());
+                    if(i + 1 == SecondaryRateLimitRetryMaxCount) {
+                        throw;
+                    }
+                    await DelayRateAsync(gitHubClient);
+                }
             }
-            return await funcAsync(gitHubClient);
+
+            throw new NotImplementedException();
         }
 
         private Task GitHubApiAsync(GitHubClient gitHubClient, Func<GitHubClient, Task> funcAsync)
@@ -210,27 +218,40 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             if(string.IsNullOrWhiteSpace(accessToken)) {
                 ConsoleUtility.Title("OAuth アクセストークン取得");
 
-                using var http = new HttpListener();
-                http.Prefixes.Add(gitHubSetting.ClientRedirectUrl);
-                ConsoleUtility.LogInformation($"HTTP({gitHubSetting.ClientRedirectUrl}) 受付開始...");
-                http.Start();
+                string token = string.Empty;
 
-                var loginUrl = client.Oauth.GetGitHubLoginUrl(new OauthLoginRequest(gitHubSetting.ClientId) {
-                    RedirectUri = new Uri(gitHubSetting.ClientRedirectUrl),
-                    State = Guid.NewGuid().ToString("N"),
-                    Scopes = {
+                using(var http = new HttpListener()) {
+                    http.Prefixes.Add(gitHubSetting.ClientRedirectUrl);
+                    ConsoleUtility.LogInformation($"HTTP({gitHubSetting.ClientRedirectUrl}) 受付開始...");
+                    http.Start();
+
+                    var loginUrl = client.Oauth.GetGitHubLoginUrl(new OauthLoginRequest(gitHubSetting.ClientId) {
+                        RedirectUri = new Uri(gitHubSetting.ClientRedirectUrl),
+                        State = Guid.NewGuid().ToString("N"),
+                        Scopes = {
                         "repo",
                         "user",
                     }
-                });
+                    });
 
-                Process.Start(new ProcessStartInfo {
-                    UseShellExecute = true,
-                    FileName = loginUrl.OriginalString,
-                });
+                    Process.Start(new ProcessStartInfo {
+                        UseShellExecute = true,
+                        FileName = loginUrl.OriginalString,
+                    });
 
-                var context = await http.GetContextAsync();
-                var token = context.Request.QueryString.Get("code");
+                    var context = await http.GetContextAsync();
+
+                    var code = context.Request.QueryString.Get("code");
+                    if(code is null) {
+                        throw new InvalidOperationException();
+                    }
+                    token = code;
+
+                    var responseBody = Encoding.UTF8.GetBytes("OK: OAuth アクセストークンをメモって下さい");
+                    context.Response.StatusCode = (int)HttpStatusCode.OK;
+                    context.Response.AddHeader("Content-Type", "text/plain");
+                    await context.Response.OutputStream.WriteAsync(responseBody, 0, responseBody.Length);
+                }
 
                 var oauthToken = await client.Oauth.CreateAccessToken(new OauthTokenRequest(
                     gitHubSetting.ClientId,
