@@ -329,6 +329,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             if(!string.IsNullOrWhiteSpace(setting.Label.Force)) {
                 githubIssue.Labels.Add(setting.Label.Force);
             }
+            // ステータス置き換え
+            if(bitbucketIssue.Status is not null && setting.Label.Mapping.Status.TryGetValue(bitbucketIssue.Status, out var status)) {
+                githubIssue.Labels.Add(status);
+            }
             // タイプ置き換え
             if(bitbucketIssue.Kind is not null && setting.Label.Mapping.Kinds.TryGetValue(bitbucketIssue.Kind, out var kind)) {
                 githubIssue.Labels.Add(kind);

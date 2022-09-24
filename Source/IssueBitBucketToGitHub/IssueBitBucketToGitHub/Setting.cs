@@ -154,6 +154,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         #region property
 
         /// <summary>
+        /// Bitbucket: ステータス と紐づけるラベル。
+        /// </summary>
+        public Dictionary<string, string> Status { get; set; } = new();
+        /// <summary>
         /// Bitbucket: タイプ と紐づけるラベル。
         /// </summary>
         public Dictionary<string, string> Kinds { get; set; } = new();

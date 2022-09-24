@@ -78,6 +78,10 @@
 		// 設定するラベル名。ラベル名を設定する場合は既存のラベルはすべて破棄される
 		"Items": [
 			"migration:Bitbucket",
+			"on hold",
+			"wontfix",
+			"invalid",
+			"duplicate",
 			"bug",
 			"enhancement",
 			"proposal",
@@ -101,6 +105,13 @@
 		"Omit": "migration:omit",
 		// Bitbucket の各項目を対象ラベルとして割り当てる
 		"Mapping": {
+			// ステータス(new/open/resolved/close は対象外)
+			"Status": {
+				"on hold": "on hold",
+				"wontfix": "wontfix",
+				"invalid": "invalid",
+				"duplicate": "duplicate"
+			},
 			// タイプ
 			"Kinds": {
 				"bug": "bug",
