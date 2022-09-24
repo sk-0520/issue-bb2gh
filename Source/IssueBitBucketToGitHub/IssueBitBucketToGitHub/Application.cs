@@ -24,13 +24,14 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region define
 
-        private const string RawDelayTime = "0.00:00:07.0";
+        private const string RawDelayTime = "0.00:00:10.0";
         private const int DisplayApiInfoCount = 10;
-        private static TimeSpan AddDelayTime = TimeSpan.FromMinutes(1);
 
         #endregion
 
         #region property
+
+        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromMinutes(1);
 
         //DateTime LastApiUseTime { get; set; } = DateTime.MinValue;
         private TimeSpan DelayTime { get; set; }
@@ -65,10 +66,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         private void ShowApiInfo(ApiInfo apiInfo)
         {
-            ConsoleUtility.Subject("API INFO");
-            ConsoleUtility.LogInformation($"Remaining: {apiInfo.RateLimit.Remaining}");
-            ConsoleUtility.LogInformation($"Limit: {apiInfo.RateLimit.Limit}");
-            ConsoleUtility.LogInformation($"Reset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
+            ConsoleUtility.Subject("\t<<API INFO>>");
+            ConsoleUtility.LogInformation($"\t\tRemaining: {apiInfo.RateLimit.Remaining}");
+            ConsoleUtility.LogInformation($"\t\tLimit: {apiInfo.RateLimit.Limit}");
+            ConsoleUtility.LogInformation($"\t\tReset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
         }
 
         private Task DelayRateAsync(GitHubClient gitHubClient)
