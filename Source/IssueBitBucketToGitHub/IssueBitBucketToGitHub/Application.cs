@@ -40,7 +40,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// <summary>
         /// レート制限(二次)発生時の待機時間に対して追加する時間
         /// </summary>
-        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromSeconds(30);
+        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromMilliseconds(1);
 
         //DateTime LastApiUseTime { get; set; } = DateTime.MinValue;
         /// <summary>
