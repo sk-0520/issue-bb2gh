@@ -35,6 +35,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         private TimeSpan DelayTime { get; set; }
         private bool NeedsSleep { get; set; } = false;
         private int ApiCallCount { get; set; } = 0;
+        private int ApiTotalCallCount { get; set; } = 0;
 
         #endregion
 
@@ -84,6 +85,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         {
             await SleepAsync();
             try {
+                ConsoleUtility.LogTrace($"API: {++ApiTotalCallCount}");
+
                 var result = await funcAsync(gitHubClient);
 
                 return result;
