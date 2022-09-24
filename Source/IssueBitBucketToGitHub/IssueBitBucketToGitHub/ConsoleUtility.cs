@@ -21,6 +21,45 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             Error,
         }
 
+        private class ColorRestore: IDisposable
+        {
+            public ColorRestore(ConsoleColor foreground, ConsoleColor background)
+            {
+                Foreground = foreground;
+                Background = background;
+            }
+
+            #region property
+
+            private ConsoleColor Foreground { get; }
+            private ConsoleColor Background { get; }
+
+            #endregion
+
+            #region IDisposable
+
+            protected virtual void Dispose(bool disposing)
+            {
+                Console.ForegroundColor = Foreground;
+                Console.BackgroundColor = Background;
+            }
+
+            // // TODO: 'Dispose(bool disposing)' にアンマネージド リソースを解放するコードが含まれる場合にのみ、ファイナライザーをオーバーライドします
+            // ~ColorRestore()
+            // {
+            //     // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
+            //     Dispose(disposing: false);
+            // }
+
+            public void Dispose()
+            {
+                // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
+                Dispose(disposing: true);
+                GC.SuppressFinalize(this);
+            }
+            #endregion
+        }
+
         #endregion
 
         #region property
@@ -50,8 +89,20 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         public static string ReadRetryDefault(string subject, string defaultValue) => ReadRetry(subject, defaultValue, RetryCount);
 
+        public static IDisposable ChangeColor(ConsoleColor foreground, ConsoleColor background)
+        {
+            var prev = new ColorRestore(Console.ForegroundColor, Console.BackgroundColor);
+
+            Console.ForegroundColor = foreground;
+            Console.BackgroundColor = background;
+
+            return prev;
+        }
+
         public static void Title(string title)
         {
+            using var restore = ChangeColor(ConsoleColor.White, ConsoleColor.DarkYellow);
+
             Console.WriteLine("========================");
             Console.WriteLine("[{0}]", title);
             Console.WriteLine("========================");
@@ -59,12 +110,23 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         public static void Subject(string title)
         {
+            using var restore = ChangeColor(ConsoleColor.White, ConsoleColor.DarkGreen);
+
             Console.WriteLine("------------------------");
             Console.WriteLine("{0}", title);
         }
 
         private static void Log(LogLevel logLevel, string message)
         {
+            using var restore = logLevel switch {
+                LogLevel.Trace => ChangeColor(ConsoleColor.DarkGray, ConsoleColor.Black),
+                LogLevel.Debug => ChangeColor(ConsoleColor.Gray, ConsoleColor.Black),
+                LogLevel.Information => ChangeColor(ConsoleColor.White, ConsoleColor.Black),
+                LogLevel.Warning => ChangeColor(ConsoleColor.Yellow, ConsoleColor.Black),
+                LogLevel.Error => ChangeColor(ConsoleColor.Black, ConsoleColor.Red),
+                _ => throw new NotImplementedException(),
+            };
+
             Console.WriteLine("[{0}] {1}", logLevel, message);
         }
 

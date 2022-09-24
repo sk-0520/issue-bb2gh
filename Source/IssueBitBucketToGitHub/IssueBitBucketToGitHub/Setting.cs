@@ -63,7 +63,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         ///  </item>
         /// </list>
         /// </summary>
-        public string IssueTitle { get; set; } = "${TITLE} <Bitbucket>";
+        public string IssueTitle { get; set; } = "<Bitbucket:${NUMBER}> ${TITLE}";
         /// <summary>
         /// 課題本文。
         /// <para><c>${KEY}</c>で文字列置き換え</para>
@@ -85,6 +85,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         ///   <description>元本文。</description>
         ///  </item>
         ///  <item>
+        ///  <item>
+        ///   <description>QUOTE_MARKDOWN</description>
+        ///   <description>(引用)元本文。</description>
+        ///  </item>
+        ///  <item>
         ///   <description>URL</description>
         ///   <description>元URL。</description>
         ///  </item>
@@ -98,11 +103,35 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         ///  </item>
         /// </list>
         /// </summary>
-        public string IssueBody { get; set; } = "${MARKDOWN}";
+        public string IssueBody { get; set; } = @"${MARKDOWN}
+
+---------------------
+
+### BitBucket から移植
+
+| 項目 | 内容 |
+|:-:|:--|
+| 元課題 | [${NUMBER}](${URL}) |
+| 起票日時 | `${CREATED_AT}` |
+| 起票者 | `${USER}` |
+
+";
         /// <summary>
         /// たぶん <see cref="IssueBody"/> と同じ。
         /// </summary>
-        public string Comment { get; set; } = "${MARKDOWN}";
+        public string Comment { get; set; } = @"${MARKDOWN}
+
+---------------------
+
+### BitBucket から移植
+
+| 項目 | 内容 |
+|:-:|:--|
+| 元課題 | [${NUMBER}](${URL}) |
+| 起票日時 | `${CREATED_AT}` |
+| 起票者 | `${USER}` |
+
+";
 
         #endregion
     }
@@ -146,6 +175,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// </summary>
         public string[] Items { get; set; } = Array.Empty<string>();
 
+        public string Force { get; set; } = string.Empty;
+
         public LabelMappingSetting Mapping { get; set; } = new();
 
         #endregion
@@ -168,10 +199,9 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         public BitbucketSetting Bitbucket { get; set; } = new();
 
         /// <summary>
-        /// ユーザー名のマッピング。
-        /// <para>キー「<c>*</c>」はマッピング設定なしの割り当て先。</para>
+        /// ユーザー名。
         /// </summary>
-        public Dictionary<string, string> UserMapping { get; set; } = new();
+        public UserSetting User { get; set; } = new();
 
         /// <summary>
         /// マイグレーションした際のテンプレート。

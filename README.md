@@ -70,13 +70,14 @@
 	// 課題の書式
 	"Template": {
 		//"IssueTitle": "${TITLE} ${NUMBER}"
-		//"IssueBody": "${TITLE} ${NUMBER} ${MARKDOWN} ${URL} ${CREATED_AT} ${USER}"
-		//"Comment": "${TITLE} ${NUMBER} ${MARKDOWN} ${URL} ${CREATED_AT} ${USER}"
+		//"IssueBody": "${TITLE} ${NUMBER} ${MARKDOWN} ${QUOTE_MARKDOWN} ${URL} ${CREATED_AT} ${USER}"
+		//"Comment": "${TITLE} ${NUMBER} ${MARKDOWN} ${QUOTE_MARKDOWN} ${URL} ${CREATED_AT} ${USER}"
 	},
 	// ラベル
 	"Label": {
 		// 設定するラベル名。ラベル名を設定する場合は既存のラベルはすべて破棄される
 		"Items": [
+			"migration:Bitbucket",
 			"bug",
 			"enhancement",
 			"proposal",
@@ -94,6 +95,8 @@
 			"ソース",
 			"プラグイン\/参照実装"
 		],
+		// 強制的に設定するラベル
+		"Force": "migration:Bitbucket",
 		// Bitbucket の各項目を対象ラベルとして割り当てる
 		"Mapping": {
 			// タイプ

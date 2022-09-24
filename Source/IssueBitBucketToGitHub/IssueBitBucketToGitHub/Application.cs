@@ -23,14 +23,18 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region define
 
-        const string RawDelayTime = "0.00:00:02.5";
+        private const string RawDelayTime = "0.00:00:08.0";
+        private const int DisplayApiInfoCount = 10;
+        private static TimeSpan AddDelayTime = TimeSpan.FromMinutes(1);
 
         #endregion
 
         #region property
 
         //DateTime LastApiUseTime { get; set; } = DateTime.MinValue;
-        TimeSpan DelayTime { get; set; }
+        private TimeSpan DelayTime { get; set; }
+        private bool NeedsSleep { get; set; } = false;
+        private int ApiCallCount { get; set; } = 0;
 
         #endregion
 
@@ -48,48 +52,53 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             //return Task.CompletedTask;
 
-            return Task.Delay(DelayTime).ContinueWith(_ => {
-                //LastApiUseTime = DateTime.UtcNow;
-            });
+            // 最初は待たない
+            if(!NeedsSleep) {
+                NeedsSleep = true;
+                return Task.CompletedTask;
+            }
+
+            return Task.Delay(DelayTime);
+        }
+
+        private void ShowApiInfo(ApiInfo apiInfo)
+        {
+            ConsoleUtility.Subject("API INFO");
+            ConsoleUtility.LogInformation($"Remaining: {apiInfo.RateLimit.Remaining}");
+            ConsoleUtility.LogInformation($"Limit: {apiInfo.RateLimit.Limit}");
+            ConsoleUtility.LogInformation($"Reset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
         }
 
         private Task DelayRateAsync(GitHubClient gitHubClient)
         {
             var apiInfo = gitHubClient.GetLastApiInfo();
+            ShowApiInfo(apiInfo);
 
-            ConsoleUtility.LogInformation($"Remaining: {apiInfo.RateLimit.Remaining}");
-            ConsoleUtility.LogInformation($"Limit: {apiInfo.RateLimit.Limit}");
-            ConsoleUtility.LogInformation($"Reset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
-
-            var delayTime = apiInfo.RateLimit.Reset - DateTime.UtcNow;
+            var delayTime = apiInfo.RateLimit.Reset - DateTime.UtcNow + AddDelayTime;
 
             ConsoleUtility.LogWarning($"limit delay: {delayTime}");
             return Task.Delay(delayTime);
-        }
-
-        private async Task GitHubApiAsync(GitHubClient gitHubClient, Func<GitHubClient, Task> funcAsync)
-        {
-            await SleepAsync();
-            try {
-                await funcAsync(gitHubClient);
-                return;
-            } catch(SecondaryRateLimitExceededException ex) {
-                ConsoleUtility.LogWarning(ex.Message);
-                await DelayRateAsync(gitHubClient);
-            }
-            await funcAsync(gitHubClient);
         }
 
         private async Task<TResult> GitHubApiAsync<TResult>(GitHubClient gitHubClient, Func<GitHubClient, Task<TResult>> funcAsync)
         {
             await SleepAsync();
             try {
-                return await funcAsync(gitHubClient);
+                var result = await funcAsync(gitHubClient);
+
+                return result;
             } catch(SecondaryRateLimitExceededException ex) {
                 ConsoleUtility.LogWarning(ex.Message);
                 await DelayRateAsync(gitHubClient);
             }
             return await funcAsync(gitHubClient);
+        }
+
+        private Task GitHubApiAsync(GitHubClient gitHubClient, Func<GitHubClient, Task> funcAsync)
+        {
+            return GitHubApiAsync(gitHubClient, c => {
+                return funcAsync(c).ContinueWith(_ => -1);
+            });
         }
 
         private Stream OpenFileStream(string path, bool writable = false)
@@ -178,8 +187,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                     RedirectUri = new Uri(gitHubSetting.ClientRedirectUrl),
                     State = Guid.NewGuid().ToString("N"),
                     Scopes = {
-                    "repo",
-                }
+                        "repo",
+                    }
                 });
 
                 Process.Start(new ProcessStartInfo {
@@ -253,6 +262,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ["TITLE"] = issue.Title,
                 ["NUMBER"] = issue.Id.ToString(),
                 ["MARKDOWN"] = issue.Content,
+                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(issue.Content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString()),
                 ["CREATED_AT"] = issue.CreatedOn.ToString("u"),
                 ["USER"] = issue.Reporter,
@@ -267,6 +277,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ["TITLE"] = issue.Title,
                 ["NUMBER"] = issue.Id.ToString(),
                 ["MARKDOWN"] = comment.Content,
+                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(comment.Content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString() + "#comment-" + comment.Id),
                 ["CREATED_AT"] = comment.CreatedOn.ToString("u"),
                 ["USER"] = comment.User,
@@ -275,36 +286,50 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return TextUtility.ReplaceFromDictionary(template, map);
         }
 
-        private async Task CreateIssueAsync(GitHubClient client, Repository repository, BitbucketIssue issue, BitbucketComment[] comments, Setting setting)
+        private async Task CreateIssueAsync(GitHubClient client, Repository repository, BitbucketIssue bitbucketIssue, BitbucketComment[] comments, Setting setting)
         {
-            ConsoleUtility.Subject($"課題生成 -> [{issue.Id}] {issue.Title}");
+            ConsoleUtility.Subject($"課題生成 -> [{bitbucketIssue.Id}] {bitbucketIssue.Title}");
 
-            var githubIssue = new NewIssue(BuildTitle(issue, setting.Template.IssueTitle, setting.Bitbucket));
+            var githubIssue = new NewIssue(BuildTitle(bitbucketIssue, setting.Template.IssueTitle, setting.Bitbucket));
 
-            githubIssue.Body = BuildIssueBody(issue, setting.Template.IssueBody, setting.Bitbucket);
+            githubIssue.Body = BuildIssueBody(bitbucketIssue, setting.Template.IssueBody, setting.Bitbucket);
 
-            if(issue.Kind is not null && setting.Label.Mapping.Kinds.TryGetValue(issue.Kind, out var kind)) {
+            // ラベル強制設定
+            if(!string.IsNullOrWhiteSpace(setting.Label.Force)) {
+                githubIssue.Labels.Add(setting.Label.Force);
+            }
+            // タイプ置き換え
+            if(bitbucketIssue.Kind is not null && setting.Label.Mapping.Kinds.TryGetValue(bitbucketIssue.Kind, out var kind)) {
                 githubIssue.Labels.Add(kind);
             }
-            if(issue.Component is not null && setting.Label.Mapping.Components.TryGetValue(issue.Component, out var component)) {
+            // コンポーネント置き換え
+            if(bitbucketIssue.Component is not null && setting.Label.Mapping.Components.TryGetValue(bitbucketIssue.Component, out var component)) {
                 githubIssue.Labels.Add(component);
             }
 
+            if(!string.IsNullOrWhiteSpace(bitbucketIssue.Assignee)) {
+                // 担当は * を考慮しない
+                if(setting.User.Mapping.TryGetValue(bitbucketIssue.Assignee, out var githubUser)) {
+                    githubIssue.Assignees.Add(githubUser);
+                }
+            }
+
             var issueResult = await GitHubApiAsync(client, c => c.Issue.Create(repository.Id, githubIssue));
-            ConsoleUtility.LogDebug($"課題結果 -> [{issue.Id}:{issueResult.Number}] {issueResult.Title}");
+            ConsoleUtility.LogDebug($"課題結果 -> [{bitbucketIssue.Id}:{issueResult.Number}] {issueResult.Title}");
 
             if(comments.Any()) {
-                ConsoleUtility.LogInformation($"課題コメント作成 [{issue.Id}:{issueResult.Number}] {comments.Length}");
+                ConsoleUtility.LogInformation($"課題コメント作成 [{bitbucketIssue.Id}:{issueResult.Number}] {comments.Length}");
+                var num = 1;
                 foreach(var comment in comments) {
-                    var commentContent = BuildCommentBody(issue, comment, setting.Template.Comment, setting.Bitbucket);
+                    var commentContent = BuildCommentBody(bitbucketIssue, comment, setting.Template.Comment, setting.Bitbucket);
                     var commentResult = await GitHubApiAsync(client, c => c.Issue.Comment.Create(repository.Id, issueResult.Number, commentContent));
-                    ConsoleUtility.LogDebug($"課題コメント結果: {commentResult.Id}");
+                    ConsoleUtility.LogDebug($"{num++}/{comments.Length} 課題コメント結果: {commentResult.Id}");
                 }
             } else {
                 ConsoleUtility.LogTrace("課題コメント無し");
             }
 
-            if(issue.Status == "closed") {
+            if(bitbucketIssue.Status == "closed") {
                 var githubUpdateIssue = new IssueUpdate() {
                     State = ItemState.Closed,
                 };
@@ -331,6 +356,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             //test 100
             foreach(var issue in bitbucketIssueList.Take(100)) {
+                if(DisplayApiInfoCount <= ++ApiCallCount) {
+                    var apiInfo = client.GetLastApiInfo();
+                    ShowApiInfo(apiInfo);
+                    ApiCallCount = 0;
+                }
+
                 if(!bitbucketIssueComments.TryGetValue(issue.Id, out var comments)) {
                     comments = Array.Empty<BitbucketComment>();
                 }
