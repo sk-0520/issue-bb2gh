@@ -376,7 +376,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ConsoleUtility.LogTrace("課題コメント無し");
             }
 
-            if(bitbucketIssue.Status == "closed") {
+            if(bitbucketIssue.Status == "closed" || bitbucketIssue.Status == "resolved") {
                 var githubUpdateIssue = new IssueUpdate() {
                     State = ItemState.Closed,
                 };
