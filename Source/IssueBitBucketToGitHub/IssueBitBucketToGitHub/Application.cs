@@ -11,6 +11,7 @@ using System.Reflection.Emit;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using ContentTypeTextNet.Pe.Core.Models;
@@ -23,7 +24,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region define
 
-        private const string RawDelayTime = "0.00:00:08.0";
+        private const string RawDelayTime = "0.00:00:07.0";
         private const int DisplayApiInfoCount = 10;
         private static TimeSpan AddDelayTime = TimeSpan.FromMinutes(1);
 
@@ -262,6 +263,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         private string AdjustContent(string content, out bool isOmit)
         {
             const int maxLength = 65536 - 500; // 500にそこまで意味はない。テンプレ次第だけどまぁ500残しておけば大丈夫かと。。。
+
+            content = Regex.Replace(content, @"→\s*<<cset\s+(?<HASH>[A-Fa-f0-9]+)>>", "→ 《cset $1》", RegexOptions.Multiline);
 
             if(content.Length < maxLength) {
                 isOmit = false;
