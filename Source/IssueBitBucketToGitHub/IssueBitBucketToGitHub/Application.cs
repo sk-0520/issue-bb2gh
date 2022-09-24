@@ -92,7 +92,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
                 return result;
             } catch(SecondaryRateLimitExceededException ex) {
-                ConsoleUtility.LogWarning(ex.Message);
+                ConsoleUtility.LogWarning(ex.ToString());
                 await DelayRateAsync(gitHubClient);
             }
             return await funcAsync(gitHubClient);
@@ -192,6 +192,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                     State = Guid.NewGuid().ToString("N"),
                     Scopes = {
                         "repo",
+                        "user",
                     }
                 });
 
