@@ -66,10 +66,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         private void ShowApiInfo(ApiInfo apiInfo)
         {
-            ConsoleUtility.Subject("\t<<API INFO>>");
-            ConsoleUtility.LogInformation($"\t\tRemaining: {apiInfo.RateLimit.Remaining}");
-            ConsoleUtility.LogInformation($"\t\tLimit: {apiInfo.RateLimit.Limit}");
-            ConsoleUtility.LogInformation($"\t\tReset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
+            using var color = ConsoleUtility.ChangeColor(ConsoleColor.Magenta, ConsoleColor.DarkBlue);
+
+            ConsoleUtility.Subject("<<API INFO>>");
+            Console.WriteLine($"\tRemaining: {apiInfo.RateLimit.Remaining}");
+            Console.WriteLine($"\tLimit: {apiInfo.RateLimit.Limit}");
+            Console.WriteLine($"\tReset: {apiInfo.RateLimit.Reset.ToLocalTime()}");
         }
 
         private Task DelayRateAsync(GitHubClient gitHubClient)
