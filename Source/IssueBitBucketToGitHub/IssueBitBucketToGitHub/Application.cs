@@ -259,13 +259,30 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return TextUtility.ReplaceFromDictionary(template, map);
         }
 
-        private string BuildIssueBody(BitbucketIssue issue, string template, BitbucketSetting bitbucketSetting)
+        private string AdjustContent(string content, out bool isOmit)
         {
+            const int maxLength = 65536 - 500; // 500にそこまで意味はない。テンプレ次第だけどまぁ500残しておけば大丈夫かと。。。
+
+            if(content.Length < maxLength) {
+                isOmit = false;
+                return content;
+            }
+
+            isOmit = true;
+            var s = content.Substring(0, maxLength);
+
+            return "#マイグレーションにより切り落とし発生!\r\n----\r\n" + s;
+        }
+
+        private string BuildIssueBody(BitbucketIssue issue, string template, BitbucketSetting bitbucketSetting, out bool isOmit)
+        {
+            var content = AdjustContent(issue.Content, out isOmit);
+
             var map = new Dictionary<string, string>() {
                 ["TITLE"] = issue.Title,
                 ["NUMBER"] = issue.Id.ToString(),
-                ["MARKDOWN"] = issue.Content,
-                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(issue.Content).Select(i => "> " + i)),
+                ["MARKDOWN"] = content,
+                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString()),
                 ["CREATED_AT"] = issue.CreatedOn.ToString("u"),
                 ["USER"] = issue.Reporter,
@@ -274,13 +291,15 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return TextUtility.ReplaceFromDictionary(template, map);
         }
 
-        private string BuildCommentBody(BitbucketIssue issue, BitbucketComment comment, string template, BitbucketSetting bitbucketSetting)
+        private string BuildCommentBody(BitbucketIssue issue, BitbucketComment comment, string template, BitbucketSetting bitbucketSetting, out bool isOmit)
         {
+            var content = AdjustContent(comment.Content, out isOmit);
+
             var map = new Dictionary<string, string>() {
                 ["TITLE"] = issue.Title,
                 ["NUMBER"] = issue.Id.ToString(),
-                ["MARKDOWN"] = comment.Content,
-                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(comment.Content).Select(i => "> " + i)),
+                ["MARKDOWN"] = content,
+                ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString() + "#comment-" + comment.Id),
                 ["CREATED_AT"] = comment.CreatedOn.ToString("u"),
                 ["USER"] = comment.User,
@@ -295,7 +314,16 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             var githubIssue = new NewIssue(BuildTitle(bitbucketIssue, setting.Template.IssueTitle, setting.Bitbucket));
 
-            githubIssue.Body = BuildIssueBody(bitbucketIssue, setting.Template.IssueBody, setting.Bitbucket);
+            githubIssue.Body = BuildIssueBody(bitbucketIssue, setting.Template.IssueBody, setting.Bitbucket, out var issueBodyFailure);
+
+            bool isOmit = false;
+            if(issueBodyFailure) {
+                ConsoleUtility.LogWarning("本文切り落とし発生");
+                if(!string.IsNullOrWhiteSpace(setting.Label.Omit)) {
+                    githubIssue.Labels.Add(setting.Label.Omit);
+                    isOmit = true;
+                }
+            }
 
             // ラベル強制設定
             if(!string.IsNullOrWhiteSpace(setting.Label.Force)) {
@@ -324,7 +352,16 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ConsoleUtility.LogInformation($"課題コメント作成 [{bitbucketIssue.Id}:{issueResult.Number}] {comments.Length}");
                 var num = 1;
                 foreach(var comment in comments) {
-                    var commentContent = BuildCommentBody(bitbucketIssue, comment, setting.Template.Comment, setting.Bitbucket);
+                    var commentContent = BuildCommentBody(bitbucketIssue, comment, setting.Template.Comment, setting.Bitbucket, out var issueCommentFailure);
+
+                    if(issueCommentFailure) {
+                        ConsoleUtility.LogWarning("コメント切り落とし発生");
+                        if(!isOmit && !string.IsNullOrWhiteSpace(setting.Label.Omit)) {
+                            var issueAddLabelResult = await GitHubApiAsync(client, c => c.Issue.Labels.AddToIssue(repository.Id, issueResult.Number, new[] { setting.Label.Omit }));
+                            isOmit = true;
+                        }
+                    }
+
                     var commentResult = await GitHubApiAsync(client, c => c.Issue.Comment.Create(repository.Id, issueResult.Number, commentContent));
                     ConsoleUtility.LogDebug($"{num++}/{comments.Length} 課題コメント結果: {commentResult.Id}");
                 }

@@ -176,6 +176,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         public string[] Items { get; set; } = Array.Empty<string>();
 
         public string Force { get; set; } = string.Empty;
+        public string Omit { get; set; } = string.Empty;
 
         public LabelMappingSetting Mapping { get; set; } = new();
 

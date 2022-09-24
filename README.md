@@ -97,6 +97,8 @@
 		],
 		// 強制的に設定するラベル
 		"Force": "migration:Bitbucket",
+		// API都合で何かしら補正が行われた場合に設定するラベル
+		"Omit": "migration:omit",
 		// Bitbucket の各項目を対象ラベルとして割り当てる
 		"Mapping": {
 			// タイプ
