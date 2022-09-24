@@ -316,7 +316,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ["MARKDOWN"] = content,
                 ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString()),
-                ["CREATED_AT"] = issue.CreatedOn.ToString("u"),
+                ["CREATED_AT"] = issue.CreatedOn.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 ["USER"] = issue.Reporter,
             };
 
@@ -333,7 +333,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ["MARKDOWN"] = content,
                 ["QUOTE_MARKDOWN"] = string.Join(Environment.NewLine, TextUtility.ReadLines(content).Select(i => "> " + i)),
                 ["URL"] = BuildUrl(bitbucketSetting.IssueBaseUrl, issue.Id.ToString() + "#comment-" + comment.Id),
-                ["CREATED_AT"] = comment.CreatedOn.ToString("u"),
+                ["CREATED_AT"] = comment.CreatedOn.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
                 ["USER"] = comment.User,
             };
 
