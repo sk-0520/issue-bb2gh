@@ -57,6 +57,13 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// </summary>
         private int ApiTotalCallCount { get; set; } = 0;
 
+        private string[] CloseStatus { get; } = new[] {
+            "closed",
+            "resolved",
+            "wontfix",
+            "duplicate",
+        };
+
         #endregion
 
         #region function
@@ -398,7 +405,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ConsoleUtility.LogTrace("課題コメント無し");
             }
 
-            if(bitbucketIssue.Status == "closed" || bitbucketIssue.Status == "resolved") {
+
+            if(CloseStatus.Contains(bitbucketIssue.Status)) {
                 var githubUpdateIssue = new IssueUpdate() {
                     State = ItemState.Closed,
                 };
