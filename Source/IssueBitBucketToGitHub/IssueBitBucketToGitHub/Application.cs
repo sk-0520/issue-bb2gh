@@ -201,11 +201,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             client.SetRequestTimeout(TimeZoneInfo.Local.BaseUtcOffset);
 
             if(string.IsNullOrWhiteSpace(accessToken)) {
-                ConsoleUtility.Title("OAuth AccessToken");
+                ConsoleUtility.Title("OAuth アクセストークン取得");
 
-                var http = new HttpListener();
+                using var http = new HttpListener();
                 http.Prefixes.Add(gitHubSetting.ClientRedirectUrl);
-                ConsoleUtility.LogInformation("HttpListener running...");
+                ConsoleUtility.LogInformation($"HTTP({gitHubSetting.ClientRedirectUrl}) 受付開始...");
                 http.Start();
 
                 var loginUrl = client.Oauth.GetGitHubLoginUrl(new OauthLoginRequest(gitHubSetting.ClientId) {
@@ -233,9 +233,9 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
                 accessToken = oauthToken.AccessToken;
 
-                ConsoleUtility.LogInformation("Access Token( --access-token=\"...\" )");
+                ConsoleUtility.LogInformation("OAuth アクセストークン取得完了 (※実行例 --access-token=\"...\" )");
                 Console.WriteLine(">> {0}", accessToken);
-                Console.WriteLine("please enter");
+                Console.WriteLine("Enterキー入力で継続します。次回起動時は上記アクセストークンをコマンドライン指定してください。");
                 Console.ReadLine();
             }
 
