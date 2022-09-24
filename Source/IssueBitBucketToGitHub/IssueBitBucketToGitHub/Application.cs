@@ -131,7 +131,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var settingPath = GetSettingValue("setting", commandLine, commandKeys.Setting, defaultPath, false)!;
 
             using var stream = OpenFileStream(settingPath);
-            var setting = JsonSerializer.Deserialize<Setting>(stream);
+            var setting = JsonSerializer.Deserialize<Setting>(stream, new JsonSerializerOptions() {
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+            });
             if(setting is null) {
                 throw new InvalidOperationException(settingPath);
             }
