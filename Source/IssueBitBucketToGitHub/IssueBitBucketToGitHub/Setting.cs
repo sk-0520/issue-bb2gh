@@ -20,8 +20,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region property
 
-        public string BaseUrl { get; set; } = "https://api.github.com";
-        public string ApiToken { get; set; } = string.Empty;
+        public string BaseUrl { get; set; } = "https://api.github.com/";
+
+        public string ClientId { get; set; } = string.Empty;
+        public string ClientSecret { get; set; } = string.Empty;
+        public string ClientRedirectUrl { get; set; } = "http://localhost:9876/";
         public string Owner { get; set; } = string.Empty;
         public string Repository { get; set; } = string.Empty;
         

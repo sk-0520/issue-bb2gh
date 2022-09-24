@@ -2,8 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Intrinsics.Arm;
@@ -90,9 +92,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return await funcAsync(gitHubClient);
         }
 
-        private Stream OpenFileStream(string path)
+        private Stream OpenFileStream(string path, bool writable = false)
         {
-            return new FileStream(path, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read);
+            var mode = writable ? System.IO.FileMode.Create : System.IO.FileMode.Open;
+            var access = writable ? FileAccess.Write : FileAccess.Read;
+            return new FileStream(path, mode, access, FileShare.Read);
         }
 
         private string GetSettingValue(string subject, CommandLine commandLine, CommandLineKey commandLineKey, string defaultValue, bool emptyIsDefaultValue)
@@ -109,13 +113,14 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return ConsoleUtility.ReadRetryDefault(subject, defaultValue);
         }
 
-        private (Setting setting, TimeSpan delayTime) LoadSetting()
+        private (Setting setting, TimeSpan delayTime, string accessToken) LoadSetting()
         {
             var commandLine = new CommandLine();
             var commandKeys = new {
                 Setting = commandLine.Add(shortKey: 's', longKey: "setting", hasValue: true),
                 DelayTime = commandLine.Add(shortKey: 'd', longKey: "delay", hasValue: true),
-                RateLimitTime = commandLine.Add(shortKey: 'r', longKey: "rate", hasValue: true),
+                //RateLimitTime = commandLine.Add(shortKey: 'r', longKey: "rate", hasValue: true),
+                AccessToken = commandLine.Add(shortKey: 'a', longKey: "access-token", hasValue: true),
             };
 
             if(!commandLine.Parse()) {
@@ -134,7 +139,9 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var rawDelayTime = GetSettingValue("delay", commandLine, commandKeys.DelayTime, RawDelayTime, true);
             var delayTime = TimeSpan.Parse(rawDelayTime);
 
-            return (setting: setting, delayTime: delayTime);
+            var accessToken = GetSettingValue("access token", commandLine, commandKeys.AccessToken, string.Empty, true);
+
+            return (setting: setting, delayTime: delayTime, accessToken: accessToken);
         }
 
         public BitbucketDbV1 LoadBitbucketDb(BitbucketSetting bitbucketSetting)
@@ -150,12 +157,51 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return result;
         }
 
-        private GitHubClient CreateGitHubClient(GitHubSetting gitHubSetting)
+        private async Task<GitHubClient> CreateGitHubClientAsync(GitHubSetting gitHubSetting, string accessToken)
         {
             var productHeaderValue = new ProductHeaderValue(Assembly.GetExecutingAssembly().GetName().Name);
-            var credentials = new Credentials(gitHubSetting.ApiToken);
-            var client = new GitHubClient(productHeaderValue, new InMemoryCredentialStore(credentials), new Uri(gitHubSetting.BaseUrl));
+            var client = new GitHubClient(productHeaderValue, new Uri(gitHubSetting.BaseUrl));
             client.SetRequestTimeout(TimeZoneInfo.Local.BaseUtcOffset);
+
+            if(string.IsNullOrWhiteSpace(accessToken)) {
+                ConsoleUtility.Title("OAuth AccessToken");
+
+                var http = new HttpListener();
+                http.Prefixes.Add(gitHubSetting.ClientRedirectUrl);
+                ConsoleUtility.LogInformation("HttpListener running...");
+                http.Start();
+
+                var loginUrl = client.Oauth.GetGitHubLoginUrl(new OauthLoginRequest(gitHubSetting.ClientId) {
+                    RedirectUri = new Uri(gitHubSetting.ClientRedirectUrl),
+                    State = Guid.NewGuid().ToString("N"),
+                    Scopes = {
+                    "repo",
+                }
+                });
+
+                Process.Start(new ProcessStartInfo {
+                    UseShellExecute = true,
+                    FileName = loginUrl.OriginalString,
+                });
+
+                var context = await http.GetContextAsync();
+                var token = context.Request.QueryString.Get("code");
+
+                var oauthToken = await client.Oauth.CreateAccessToken(new OauthTokenRequest(
+                    gitHubSetting.ClientId,
+                    gitHubSetting.ClientSecret,
+                    token
+                ));
+
+                accessToken = oauthToken.AccessToken;
+
+                ConsoleUtility.LogInformation("Access Token( --access-token=\"...\" )");
+                Console.WriteLine(">> {0}", accessToken);
+                Console.WriteLine("please enter");
+                Console.ReadLine();
+            }
+
+            client.Credentials = new Credentials(accessToken);
 
             return client;
         }
@@ -289,13 +335,13 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             }
         }
 
-        private async Task ExecuteCoreAsync(Setting setting, TimeSpan delayTime)
+        private async Task ExecuteCoreAsync(Setting setting, TimeSpan delayTime, string accessToken)
         {
             DelayTime = delayTime;
 
             var bitbucketDb = LoadBitbucketDb(setting.Bitbucket);
 
-            var client = CreateGitHubClient(setting.GitHub);
+            var client = await CreateGitHubClientAsync(setting.GitHub, accessToken);
 
             var repository = await GitHubApiAsync(client, c => c.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository));
 
@@ -315,7 +361,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         public Task ExecuteAsync()
         {
             var setting = LoadSetting();
-            return ExecuteCoreAsync(setting.setting, setting.delayTime);
+            return ExecuteCoreAsync(setting.setting, setting.delayTime, setting.accessToken);
         }
 
         #endregion
