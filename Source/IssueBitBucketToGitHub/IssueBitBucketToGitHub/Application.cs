@@ -24,19 +24,37 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region define
 
+        /// <summary>
+        /// 指定なしの場合のAPI発行通常待機時間。
+        /// </summary>
         private const string RawDelayTime = "0.00:00:10.0";
+        /// <summary>
+        /// 現在レート表示を行う感覚(課題のみ)。
+        /// </summary>
         private const int DisplayApiInfoCount = 10;
 
         #endregion
 
         #region property
 
-        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromMinutes(1);
+        /// <summary>
+        /// レート制限(二次)発生時の待機時間に対して追加する時間
+        /// </summary>
+        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromSeconds(30);
 
         //DateTime LastApiUseTime { get; set; } = DateTime.MinValue;
+        /// <summary>
+        /// API発行通常待機時間。
+        /// </summary>
         private TimeSpan DelayTime { get; set; }
         private bool NeedsSleep { get; set; } = false;
+        /// <summary>
+        /// <see cref="DisplayApiInfoCount"/> に対するAPI呼び出し回数。
+        /// </summary>
         private int ApiCallCount { get; set; } = 0;
+        /// <summary>
+        /// アプリケーション稼働中のAPI使用回数（ただ加算してるだけ）。
+        /// </summary>
         private int ApiTotalCallCount { get; set; } = 0;
 
         #endregion
@@ -81,7 +99,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             var delayTime = apiInfo.RateLimit.Reset - DateTime.UtcNow + AddDelayTime;
 
-            ConsoleUtility.LogWarning($"limit delay: {delayTime}");
+            ConsoleUtility.LogWarning($"こんだけ待つよ: {delayTime}");
             return Task.Delay(delayTime);
         }
 
@@ -428,7 +446,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
             var client = await CreateGitHubClientAsync(setting.GitHub, accessToken);
 
-            var repository = await GitHubApiAsync(client, c => c.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository));
+            //var repository = await GitHubApiAsync(client, c => c.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository));
+            var repository = await client.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository);
 
             if(setting.Continue.BuildLabel) {
                 if(setting.Label.Items.Any()) {
