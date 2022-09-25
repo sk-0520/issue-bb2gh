@@ -29,8 +29,12 @@
 {
 	// 再実施設定
 	"Continue": {
-		// ラベル構築を行うか
-		"BuildLabel": false,
+		// ラベル構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定。 ※バージョン/マイルストーンをラベル扱いする場合にも影響する)
+		//"BuildLabel": false,
+		// バージョン構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定  ※ラベル指定設定により処理されない可能性あり)
+		//"BuildVersion": false,
+		// バージョン構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定  ※ラベル指定設定により処理されない可能性あり)
+		//"BuildMilestone": false,
 		// 開始課題番号(Bitbucketの課題番号, 再実施しない場合は0)
 		"StartIssueNumber": 42
 	},
@@ -55,6 +59,20 @@
 		"IssueDirectoryPath": "X:\\work\\issues",
 		// Bitbucket エクスポート元課題のURL（元リンクとして使用される）
 		"IssueBaseUrl": "https://bitbucket.org/sk_0520/pe/issues"
+		// バージョンの扱い
+		"Version": {
+			// ラベルとして扱うか。falseの場合、GitHub のマイルストーンに設定されるがマイルストーンと競合する場合、エラーとなる
+			//"IsLabel": true,
+			// ラベルとして扱う場合の書式(${VERSION})
+			//"LabelTemplate": "version:${VERSION}"
+		},
+		// マイルストーンの扱い
+		"Milestone": {
+			// ラベルとして扱うか。falseの場合、GitHub のマイルストーンに設定されるがバージョンと競合する場合、エラーとなる
+			//"IsLabel": false,
+			// ラベルとして扱う場合の書式(${MILESTONE})
+			//"LabelTemplate": "milestone:${MILESTONE}"
+		}
 	},
 	// ユーザー設定
 	"User": {

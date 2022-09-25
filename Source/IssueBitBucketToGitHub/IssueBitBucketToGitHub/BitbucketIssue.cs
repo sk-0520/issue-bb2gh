@@ -7,6 +7,26 @@ using System.Threading.Tasks;
 
 namespace ContentTypeTextNet.IssueBitBucketToGitHub
 {
+    public class BitBucketVersion
+    {
+        #region property
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        #endregion
+    }
+
+    public class BitBucketMilestone
+    {
+        #region property
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        #endregion
+    }
+
     public class BitbucketIssue
     {
         #region property
@@ -63,9 +83,15 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         #endregion
     }
 
-    public class BitbucketDbV1
+    public class BitbucketDb
     {
         #region property
+
+        [JsonPropertyName("milestones")]
+        public BitBucketMilestone[] Milestones { get; set; } = Array.Empty<BitBucketMilestone>();
+
+        [JsonPropertyName("versions")]
+        public BitBucketVersion[] Versions { get; set; } = Array.Empty<BitBucketVersion>();
 
         [JsonPropertyName("issues")]
         public BitbucketIssue[] Issues { get; set; } = Array.Empty<BitbucketIssue>();

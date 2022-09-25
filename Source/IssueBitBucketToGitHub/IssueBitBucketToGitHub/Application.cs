@@ -27,7 +27,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// <summary>
         /// 指定なしの場合のAPI発行通常待機時間。
         /// </summary>
-        private const string RawDelayTime = "0.00:00:10.0";
+        //private const string RawDelayTime = "0.00:00:10.0";
+        private const string RawDelayTime = "0.00:00:01.0";
         /// <summary>
         /// 現在レート表示を行う感覚(課題のみ)。
         /// </summary>
@@ -192,6 +193,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             if(setting is null) {
                 throw new InvalidOperationException(settingPath);
             }
+            if(!setting.Bitbucket.Version.IsLabel && !setting.Bitbucket.Milestone.IsLabel) {
+                throw new Exception("バージョン・マイルストーンの両方を非ラベル設定にするのは無理");
+            }
+
 
             var rawDelayTime = GetSettingValue("delay", commandLine, commandKeys.DelayTime, RawDelayTime, true);
             var delayTime = TimeSpan.Parse(rawDelayTime);
@@ -201,12 +206,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return (setting: setting, delayTime: delayTime, accessToken: accessToken);
         }
 
-        public BitbucketDbV1 LoadBitbucketDb(BitbucketSetting bitbucketSetting)
+        public BitbucketDb LoadBitbucketDb(BitbucketSetting bitbucketSetting)
         {
             var issueFilePath = Path.Combine(bitbucketSetting.IssueDirectoryPath, "db-1.0.json");
 
             using var stream = OpenFileStream(issueFilePath);
-            var result = JsonSerializer.Deserialize<BitbucketDbV1>(stream);
+            var result = JsonSerializer.Deserialize<BitbucketDb>(stream);
             if(result is null) {
                 throw new InvalidOperationException(issueFilePath);
             }
@@ -219,7 +224,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var productHeaderValue = new ProductHeaderValue(Assembly.GetExecutingAssembly().GetName().Name);
             var client = new GitHubClient(productHeaderValue, new Uri(gitHubSetting.BaseUrl));
             client.SetRequestTimeout(TimeZoneInfo.Local.BaseUtcOffset);
-            
+
             if(string.IsNullOrWhiteSpace(accessToken)) {
                 ConsoleUtility.Title("OAuth アクセストークン取得");
 
@@ -277,7 +282,22 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return client;
         }
 
-        private async Task ApplyLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting)
+        private string BuildVersionLabelName(string template, string version)
+        {
+            var map = new Dictionary<string, string>() {
+                ["VERSION"] = version,
+            };
+            return TextUtility.ReplaceFromDictionary(template, map);
+        }
+        private string BuildMilestoneLabelName(string template, string milestone)
+        {
+            var map = new Dictionary<string, string>() {
+                ["MILESTONE"] = milestone,
+            };
+            return TextUtility.ReplaceFromDictionary(template, map);
+        }
+
+        private async Task<int> ApplyLabelAsync(GitHubClient client, Repository repository, LabelSetting labelSetting, VersionSetting versionSetting, MilestoneSetting milestoneSetting, BitbucketDb bitbucketDb)
         {
             var labels = await GitHubApiAsync(client, c => c.Issue.Labels.GetAllForRepository(repository.Id));
             if(labels.Any()) {
@@ -291,12 +311,47 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 ConsoleUtility.LogTrace("削除ラベルなし");
             }
 
-            ConsoleUtility.Subject("既存ラベル生成");
-            foreach(var item in labelSetting.Items) {
+            ConsoleUtility.Subject("ラベル生成");
+            var newLabels = labelSetting.Items.ToList();
+            if(versionSetting.IsLabel) {
+                newLabels.AddRange(bitbucketDb.Versions.Select(i => BuildVersionLabelName(versionSetting.LabelTemplate, i.Name)));
+            }
+            if(milestoneSetting.IsLabel) {
+                newLabels.AddRange(bitbucketDb.Milestones.Select(i => BuildMilestoneLabelName(milestoneSetting.LabelTemplate, i.Name)));
+            }
+            int createdCount = 0;
+            foreach(var item in newLabels) {
                 ConsoleUtility.LogInformation($"ラベル作成: {item}");
                 var newLabel = new NewLabel(item, "cccccc"); // 色なんか後で変えてくれ
                 var label = await GitHubApiAsync(client, c => c.Issue.Labels.Create(repository.Id, newLabel));
                 ConsoleUtility.LogDebug($"ラベル結果: {label.Id}");
+                createdCount += 1;
+            }
+
+            return createdCount;
+        }
+
+        private async Task ApplyMilestoneAsync(GitHubClient client, Repository repository, IEnumerable<string> items)
+        {
+            var miscellaneous = await GitHubApiAsync(client, c => c.Issue.Milestone.GetAllForRepository(repository.Id));
+            if(miscellaneous.Any()) {
+                ConsoleUtility.Subject("既存マイルストーン破棄");
+
+                foreach(var miscellane in miscellaneous) {
+                    ConsoleUtility.LogInformation($"マイルストーン削除: {miscellane.Id}, {miscellane.Title}");
+                    await GitHubApiAsync(client, c => c.Issue.Milestone.Delete(repository.Id, miscellane.Number));
+                }
+            } else {
+                ConsoleUtility.LogTrace("削除マイルストーンなし");
+            }
+
+            ConsoleUtility.Subject("マイルストーン生成");
+
+            foreach(var item in items) {
+                ConsoleUtility.LogInformation($"マイルストーン作成: {item}");
+                var newMilestone = new NewMilestone(item); // 細かい処理はwebでどうぞ。
+                var milestone = await GitHubApiAsync(client, c => c.Issue.Milestone.Create(repository.Id, newMilestone));
+                ConsoleUtility.LogDebug($"マイルストーン結果: {milestone.Id}");
             }
         }
 
@@ -442,7 +497,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             }
         }
 
-        private async Task ApplyIssuesAsync(GitHubClient client, Repository repository, BitbucketDbV1 bitbucketDb, Setting setting)
+        private async Task ApplyIssuesAsync(GitHubClient client, Repository repository, BitbucketDb bitbucketDb, Setting setting)
         {
             var bitbucketIssueList = bitbucketDb.Issues
                 .Where(i => setting.Continue.StartIssueNumber <= i.Id)
@@ -484,15 +539,29 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var repository = await client.Repository.Get(setting.GitHub.Owner, setting.GitHub.Repository);
 
             if(setting.Continue.BuildLabel) {
-                if(setting.Label.Items.Any()) {
-                    ConsoleUtility.Title("ラベル構築");
-                    await ApplyLabelAsync(client, repository, setting.Label);
-                    ConsoleUtility.LogWarning("ラベル構築 未実施");
+                ConsoleUtility.Title("ラベル構築");
+                var labelCount = await ApplyLabelAsync(client, repository, setting.Label, setting.Bitbucket.Version, setting.Bitbucket.Milestone, bitbucketDb);
+                ConsoleUtility.LogDebug($"ラベル数: {labelCount}");
+            }
+
+            if(setting.Continue.BuildVersion) {
+                if(!setting.Bitbucket.Version.IsLabel) {
+                    ConsoleUtility.Title("バージョンによるマイルストーン構築");
+                    var items = bitbucketDb.Versions.Select(i => i.Name).ToArray();
+                    await ApplyMilestoneAsync(client, repository, items);
                 }
             }
 
-            ConsoleUtility.Title("課題構築");
-            await ApplyIssuesAsync(client, repository, bitbucketDb, setting);
+            if(setting.Continue.BuildMilestone) {
+                if(!setting.Bitbucket.Milestone.IsLabel) {
+                    ConsoleUtility.Title("マイルストーン構築");
+                    var items = bitbucketDb.Milestones.Select(i => i.Name).ToArray();
+                    await ApplyMilestoneAsync(client, repository, items);
+                }
+            }
+
+            //ConsoleUtility.Title("課題構築");
+            //await ApplyIssuesAsync(client, repository, bitbucketDb, setting);
 
         }
 

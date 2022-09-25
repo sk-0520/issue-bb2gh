@@ -10,8 +10,22 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
     {
         #region proeprty
 
-        public bool BuildLabel { get; set; }
-        public int StartIssueNumber { get; set; }
+        /// <summary>
+        /// ラベル構築を行うか
+        /// <para>再実施しない場合は<c>true</c>、もしくはプロパティ未指定</para>
+        /// </summary>
+        public bool BuildLabel { get; set; } = true;
+        /// <summary>
+        /// バージョン構築を行うか
+        /// <para>再実施しない場合は<c>true</c>、もしくはプロパティ未指定</para>
+        /// </summary>
+        public bool BuildVersion { get; set; } = true;
+        /// <summary>
+        /// マイルストーン構築を行うか
+        /// <para>再実施しない場合は<c>true</c>、もしくはプロパティ未指定</para>
+        /// </summary>
+        public bool BuildMilestone { get; set; } = true;
+        public int StartIssueNumber { get; set; } = 0;
 
         #endregion
     }
@@ -27,7 +41,29 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         public string ClientRedirectUrl { get; set; } = "http://localhost:9876/";
         public string Owner { get; set; } = string.Empty;
         public string Repository { get; set; } = string.Empty;
-        
+
+        #endregion
+    }
+
+    public class VersionSetting
+    {
+        #region property
+
+        public bool IsLabel { get; set; } = true;
+
+        public string LabelTemplate { get; set; } = "version:${VERSION}";
+
+        #endregion
+    }
+
+    public class MilestoneSetting
+    {
+        #region property
+
+        public bool IsLabel { get; set; } = false;
+
+        public string LabelTemplate { get; set; } = "milestone:${MILESTONE}";
+
         #endregion
     }
 
@@ -37,6 +73,10 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
 
         public string IssueDirectoryPath { get; set; } = string.Empty;
         public string IssueBaseUrl { get; set; } = string.Empty;
+
+        public VersionSetting Version { get; set; } = new();
+        public MilestoneSetting Milestone { get; set; } = new();
+
 
         #endregion
     }
