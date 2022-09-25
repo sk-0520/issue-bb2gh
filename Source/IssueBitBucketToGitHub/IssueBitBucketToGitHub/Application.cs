@@ -28,7 +28,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// 指定なしの場合のAPI発行通常待機時間。
         /// </summary>
         //private const string RawDelayTime = "0.00:00:10.0";
-        private const string RawDelayTime = "0.00:00:01.0";
+        private const string RawDelayTime = "0.00:00:10.0";
         /// <summary>
         /// 現在レート表示を行う感覚(課題のみ)。
         /// </summary>
@@ -421,7 +421,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             return TextUtility.ReplaceFromDictionary(template, map);
         }
 
-        private async Task CreateIssueAsync(GitHubClient client, Repository repository, BitbucketIssue bitbucketIssue, BitbucketComment[] comments, Setting setting)
+        private async Task CreateIssueAsync(GitHubClient client, Repository repository, BitbucketIssue bitbucketIssue, BitbucketComment[] comments, Setting setting, IReadOnlyDictionary<string, Milestone> milestoneMap)
         {
             ConsoleUtility.Subject($"課題生成 -> [{bitbucketIssue.Id}] {bitbucketIssue.Title}");
 
@@ -453,6 +453,22 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             // コンポーネント置き換え
             if(bitbucketIssue.Component is not null && setting.Label.Mapping.Components.TryGetValue(bitbucketIssue.Component, out var component)) {
                 githubIssue.Labels.Add(component);
+            }
+            // バージョン設定
+            if(bitbucketIssue.Version is not null) {
+                if(setting.Bitbucket.Version.IsLabel) {
+                    githubIssue.Labels.Add(BuildVersionLabelName(setting.Bitbucket.Version.LabelTemplate, bitbucketIssue.Version));
+                } else {
+                    githubIssue.Milestone = milestoneMap[bitbucketIssue.Version].Number;
+                }
+            }
+            // マイルストーン設定
+            if(bitbucketIssue.Milestone is not null) {
+                if(setting.Bitbucket.Milestone.IsLabel) {
+                    githubIssue.Labels.Add(BuildMilestoneLabelName(setting.Bitbucket.Version.LabelTemplate, bitbucketIssue.Milestone));
+                } else {
+                    githubIssue.Milestone = milestoneMap[bitbucketIssue.Milestone].Number;
+                }
             }
 
             if(!string.IsNullOrWhiteSpace(bitbucketIssue.Assignee)) {
@@ -491,6 +507,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 var githubUpdateIssue = new IssueUpdate() {
                     State = ItemState.Closed,
                 };
+                if(bitbucketIssue.Version is not null && !setting.Bitbucket.Version.IsLabel) {
+                    githubUpdateIssue.Milestone = milestoneMap[bitbucketIssue.Version].Number;
+                } else if(bitbucketIssue.Milestone is not null && !setting.Bitbucket.Milestone.IsLabel) {
+                    githubUpdateIssue.Milestone = milestoneMap[bitbucketIssue.Milestone].Number;
+                }
 
                 var issueCloseResult = await GitHubApiAsync(client, c => c.Issue.Update(repository.Id, issueResult.Number, githubUpdateIssue));
                 ConsoleUtility.LogDebug($"課題クローズ: {issueCloseResult.Id}");
@@ -512,8 +533,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 )
             ;
 
-            //test 100
-            foreach(var issue in bitbucketIssueList.Take(100)) {
+            ConsoleUtility.Title("マイルストーン一覧取得");
+            var milestone = await GitHubApiAsync(client, c => c.Issue.Milestone.GetAllForRepository(repository.Id, ApiOptions.None));
+            var milestoneMap = milestone.ToDictionary(k => k.Title, v => v);
+
+            foreach(var issue in bitbucketIssueList) {
                 if(DisplayApiInfoCount <= ++ApiCallCount) {
                     var apiInfo = client.GetLastApiInfo();
                     ShowApiInfo(apiInfo);
@@ -523,7 +547,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 if(!bitbucketIssueComments.TryGetValue(issue.Id, out var comments)) {
                     comments = Array.Empty<BitbucketComment>();
                 }
-                await CreateIssueAsync(client, repository, issue, comments, setting);
+                await CreateIssueAsync(client, repository, issue, comments, setting, milestoneMap);
             }
         }
 
@@ -560,8 +584,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 }
             }
 
-            //ConsoleUtility.Title("課題構築");
-            //await ApplyIssuesAsync(client, repository, bitbucketDb, setting);
+            ConsoleUtility.Title("課題構築");
+            await ApplyIssuesAsync(client, repository, bitbucketDb, setting);
 
         }
 

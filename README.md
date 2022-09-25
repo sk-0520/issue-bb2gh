@@ -30,13 +30,13 @@
 	// 再実施設定
 	"Continue": {
 		// ラベル構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定。 ※バージョン/マイルストーンをラベル扱いする場合にも影響する)
-		//"BuildLabel": false,
+		//"BuildLabel": true,
 		// バージョン構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定  ※ラベル指定設定により処理されない可能性あり)
-		//"BuildVersion": false,
+		//"BuildVersion": true,
 		// バージョン構築を行うか(再実施しない場合はtrue、もしくはプロパティ未指定  ※ラベル指定設定により処理されない可能性あり)
-		//"BuildMilestone": false,
+		//"BuildMilestone": true,
 		// 開始課題番号(Bitbucketの課題番号, 再実施しない場合は0)
-		"StartIssueNumber": 42
+		//"StartIssueNumber": 0
 	},
 	// GitHub 設定
 	"GitHub": {

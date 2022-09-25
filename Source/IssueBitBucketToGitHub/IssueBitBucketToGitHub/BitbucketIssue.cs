@@ -55,6 +55,11 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         [JsonPropertyName("kind")]
         public string Kind { get; set; } = string.Empty;
 
+        [JsonPropertyName("milestone")]
+        public string? Milestone { get; set; }
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
+
         [JsonPropertyName("component")]
         public string Component { get; set; } = string.Empty;
 
