@@ -240,7 +240,6 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                         State = Guid.NewGuid().ToString("N"),
                         Scopes = {
                         "repo",
-                        "user",
                     }
                     });
 
@@ -255,12 +254,18 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                     if(code is null) {
                         throw new InvalidOperationException();
                     }
-                    token = code;
 
-                    var responseBody = Encoding.UTF8.GetBytes("OK: OAuth アクセストークンをメモって下さい");
+                    var responseBody = Encoding.UTF8.GetBytes(string.Join(Environment.NewLine, new[] {
+                        "OK: OAuth アクセストークンをメモって下さい",
+                        "アクセストークン: " + code
+                    }));
                     context.Response.StatusCode = (int)HttpStatusCode.OK;
-                    context.Response.AddHeader("Content-Type", "text/plain");
+                    context.Response.AddHeader("Content-Type", "text/plain; charset=utf-8");
                     await context.Response.OutputStream.WriteAsync(responseBody, 0, responseBody.Length);
+                    await context.Response.OutputStream.FlushAsync();
+                    context.Response.Close();
+
+                    token = code;
                 }
 
                 var oauthToken = await client.Oauth.CreateAccessToken(new OauthTokenRequest(
@@ -507,6 +512,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
                 var githubUpdateIssue = new IssueUpdate() {
                     State = ItemState.Closed,
                 };
+                // マイルストーンの再設定(これしないとクローズの時点でマイルストーンが消える)
                 if(bitbucketIssue.Version is not null && !setting.Bitbucket.Version.IsLabel) {
                     githubUpdateIssue.Milestone = milestoneMap[bitbucketIssue.Version].Number;
                 } else if(bitbucketIssue.Milestone is not null && !setting.Bitbucket.Milestone.IsLabel) {
