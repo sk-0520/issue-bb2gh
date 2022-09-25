@@ -41,7 +41,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// <summary>
         /// レート制限(二次)発生時の待機時間に対して追加する時間
         /// </summary>
-        private static TimeSpan AddDelayTime { get; } = TimeSpan.FromMilliseconds(5);
+        private static TimeSpan AddSecondaryRateLimitDelayTime { get; } = TimeSpan.FromMinutes(5);
 
         //DateTime LastApiUseTime { get; set; } = DateTime.MinValue;
         /// <summary>
@@ -105,7 +105,12 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var apiInfo = gitHubClient.GetLastApiInfo();
             ShowApiInfo(apiInfo);
 
-            var delayTime = apiInfo.RateLimit.Reset - DateTime.UtcNow + AddDelayTime;
+            var delayTime = apiInfo.RateLimit.Reset - DateTime.UtcNow + AddSecondaryRateLimitDelayTime;
+
+            if(delayTime.TotalMilliseconds < 0) {
+                ConsoleUtility.LogError($"待たないよ: {delayTime}");
+                return Task.CompletedTask;
+            }
 
             ConsoleUtility.LogWarning($"こんだけ待つよ: {delayTime}");
             return Task.Delay(delayTime);
@@ -214,7 +219,7 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
             var productHeaderValue = new ProductHeaderValue(Assembly.GetExecutingAssembly().GetName().Name);
             var client = new GitHubClient(productHeaderValue, new Uri(gitHubSetting.BaseUrl));
             client.SetRequestTimeout(TimeZoneInfo.Local.BaseUtcOffset);
-
+            
             if(string.IsNullOrWhiteSpace(accessToken)) {
                 ConsoleUtility.Title("OAuth アクセストークン取得");
 
