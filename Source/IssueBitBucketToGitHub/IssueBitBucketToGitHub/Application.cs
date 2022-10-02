@@ -27,8 +27,8 @@ namespace ContentTypeTextNet.IssueBitBucketToGitHub
         /// <summary>
         /// 指定なしの場合のAPI発行通常待機時間。
         /// </summary>
-        //private const string RawDelayTime = "0.00:00:10.0";
-        private const string RawDelayTime = "0.00:00:05.0";
+        private const string RawDelayTime = "0.00:00:15.0";
+        //private const string RawDelayTime = "0.00:00:05.0";
         /// <summary>
         /// 現在レート表示を行う感覚(課題のみ)。
         /// </summary>
